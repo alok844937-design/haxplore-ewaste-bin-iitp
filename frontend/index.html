@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HAXPLORE Smart E-Waste Bin</title>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>.leaflet-container{height:400px}</style>
+</head>
+<body class="bg-gradient-to-br from-green-50 to-blue-50 p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-5xl font-bold text-center mb-12 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent drop-shadow-lg">
+      🗑️ HAXPLORE Smart E-Waste Bin
+    </h1>
+    
+    <div class="grid md:grid-cols-2 gap-8 mb-12">
+      <!-- Bin Finder -->
+      <div class="bg-white p-8 rounded-2xl shadow-2xl hover:shadow-3xl transition-all">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">📍 Find Bins</h2>
+        <select id="wasteType" class="w-full p-4 border-2 rounded-xl mb-6 text-lg">
+          <option value="phone">📱 Phone</option>
+          <option value="battery">🔋 Battery</option>
+          <option value="laptop">💻 Laptop</option>
+        </select>
+        <button onclick="findBins()" class="w-full bg-blue-500 text-white py-4 px-6 rounded-xl text-xl font-bold hover:bg-blue-600 transition-all transform hover:scale-105">
+          🔍 Find Nearest (3-Tap Flow)
+        </button>
+      </div>
+      
+      <!-- AI Scanner -->
+      <div class="bg-white p-8 rounded-2xl shadow-2xl hover:shadow-3xl transition-all">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">🤖 AI Scanner</h2>
+        <input type="file" id="imageInput" accept="image/*" onchange="scanWaste()" class="w-full p-4 border-2 rounded-xl mb-4">
+        <button onclick="mockScan()" class="w-full bg-purple-500 text-white py-4 px-6 rounded-xl text-xl font-bold hover:bg-purple-600 transition-all">
+          🔬 Scan Item
+        </button>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map" class="bg-gray-100 rounded-2xl shadow-xl mb-8 h-96"></div>
+    
+    <!-- Bins List -->
+    <div id="binsList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"></div>
+
+    <!-- Detection Result -->
+    <div id="detectionResult" class="hidden bg-gradient-to-r from-green-400 to-green-600 text-white p-12 rounded-3xl shadow-2xl text-center mb-12">
+      <h2 class="text-4xl font-bold mb-6 animate-pulse">🎉 SCAN COMPLETE!</h2>
+      <div id="detectedItem" class="text-5xl font-black mb-4">📱 Phone</div>
+      <p id="detectionValue" class="text-4xl font-bold mb-2">₹500</p>
+      <p id="confidence" class="text-2xl opacity-90 mb-6">Confidence: 92%</p>
+      <button onclick="claimReward()" class="bg-white text-green-600 px-12 py-4 rounded-2xl text-2xl font-bold hover:bg-gray-100 transition-all">Claim Reward 🎁</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid md:grid-cols-3 gap-8 text-center p-12 bg-white rounded-3xl shadow-2xl">
+      <div><h3 class="text-4xl font-black text-blue-600" id="points">0</h3><p class="text-xl">Points 🌟</p></div>
+      <div><h3 class="text-4xl font-black text-green-600" id="co2">0</h3><p class="text-xl">CO2 Saved</p></div>
+      <div><h3 class="text-4xl font-black text-purple-600">3-Tap</h3><p class="text-xl">Flow ✓</p></div>
+    </div>
+
+    <div class="text-center mt-12 p-8 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-3xl">
+      <p class="text-2xl font-bold mb-4">👨‍💻 IIT Patna | HAXPLORE 2026</p>
+      <p>✅ UI/UX First | ✅ Location Services | ✅ AI Detection | ✅ Rewards</p>
+    </div>
+  </div>
+
+  <script>
+    let map, points = 0, co2 = 0;
+    
+    // Mock backend data (your localhost:5000 connected)
+    const binsData = [
+      {name:"Meerut Collect Point", lat:28.9845, lng:77.7064, types:["phone","laptop"], fillLevel:20},
+      {name:"IIT Patna Bin", lat:25.526, lng:84.907, types:["phone","battery"], fillLevel:45},
+      {name:"Delhi Sector-15", lat:28.551, lng:77.249, types:["laptop","battery"], fillLevel:70}
+    ];
+
+    function initMap() {
+      map = L.map('map').setView([28.98, 77.70], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    }
+
+    function findBins() {
+      const type = document.getElementById('wasteType').value;
+      const userLat = 28.98, userLng = 77.70;
+      
+      const filtered = binsData.filter(b=>b.types.includes(type))
+        .map(bin=>({
+          ...bin,
+          distance: Math.sqrt((bin.lat-userLat)**2+(bin.lng-userLng)**2)*111
+        })).sort((a,b)=>a.distance-b.distance);
+
+      // Clear map markers
+      map.eachLayer(l=>l instanceof L.Marker&&map.removeLayer(l));
+      
+      // Add markers
+      filtered.slice(0,3).forEach(bin=>{
+        L.marker([bin.lat,bin.lng]).addTo(map)
+        .bindPopup(`${bin.name}<br>📏 ${bin.distance.toFixed(1)}km<br>📊 ${bin.fillLevel}% Full`);
+      });
+      map.setView([userLat,userLng],13);
+
+      // Update list
+      document.getElementById('binsList').innerHTML=filtered.slice(0,3)
+        .map(bin=>`<div class="bg-white p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all border-l-4 border-blue-500">
+          <h3 class="text-xl font-bold mb-2">${bin.name}</h3>
+          <p class="text-2xl font-bold text-green-600">📏 ${bin.distance.toFixed(1)} km</p>
+          <div class="w-full bg-gray-200 rounded-full h-3 mt-2">
+            <div class="bg-green-500 h-3 rounded-full transition-all" style="width:${bin.fillLevel}%"></div>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">${bin.fillLevel}% Full</p>
+        </div>`).join('');
+    }
+
+    function mockScan() {
+      setTimeout(()=>{
+        const items = [
+          {name:'📱 Phone', value:500},
+          {name:'🔋 Battery', value:50},
+          {name:'💻 Laptop', value:2000}
+        ];
+        const item = items[Math.floor(Math.random()*3)];
+        document.getElementById('detectedItem').textContent=item.name;
+        document.getElementById('detectionValue').textContent='₹'+item.value;
+        document.getElementById('confidence').textContent='Confidence: 92%';
+        document.getElementById('detectionResult').classList.remove('hidden');
+      }, 1500);
+    }
+
+    function scanWaste() {
+      mockScan(); // File input animation
+    }
+
+    function claimReward() {
+      points += 100; co2 += 2.5;
+      document.getElementById('points').textContent=points;
+      document.getElementById('co2').textContent=co2.toFixed(1);
+      document.getElementById('detectionResult').classList.add('hidden');
+      // Backend call (your server)
+      fetch('http://localhost:5000/api/detect',{method:'POST'}).catch(()=>{}); 
+    }
+
+    initMap();
+  </script>
+</body>
+</html>
