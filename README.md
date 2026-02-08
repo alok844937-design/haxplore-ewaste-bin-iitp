@@ -90,11 +90,6 @@ A connected system of:
 See full folder structure in root directory.
 
 
-## ▶️ Demo
-Live Demo & Video:  
-👉 See `demo-link.md`
-
-
 ## 🧪 Note on AI & Hardware
 This project uses **simulated smart bins and AI detection** to focus on UI/UX, trust, and system design — as per hackathon requirements.
 
